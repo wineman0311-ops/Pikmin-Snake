@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>皮克敏貪吃蛇</title>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body {
+      background: radial-gradient(ellipse at center,#2d5a1b 0%,#152e0a 100%);
+      min-height:100vh; display:flex; flex-direction:column;
+      align-items:center; justify-content:center;
+      font-family:'Segoe UI',Arial,sans-serif; color:#fff; padding:12px; gap:8px;
+    }
+    h1 { font-size:2rem; color:#aaff55; text-shadow:0 0 14px rgba(120,255,60,.65),2px 2px 0 #0d1f06; letter-spacing:2px; }
+    #scoreRow { display:flex; gap:12px; flex-wrap:wrap; justify-content:center; }
+    .sbox { background:rgba(0,0,0,.45); border:2px solid #4e8a32; border-radius:20px; padding:4px 16px; color:#ffe066; font-size:.9rem; }
+    .sbox b { font-size:1.1rem; }
+    #layout { display:flex; gap:14px; align-items:flex-start; flex-wrap:wrap; justify-content:center; }
+    #gWrap { position:relative; border:4px solid #4e8a32; border-radius:10px; overflow:hidden; box-shadow:0 0 28px rgba(70,190,40,.35); flex-shrink:0; }
+    canvas { display:block; }
+    #overlay { position:absolute; inset:0; background:rgba(8,24,4,.83); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:9px; border-radius:6px; }
+    #overlay h2 { font-size:1.75rem; color:#aaff55; text-shadow:0 0 10px #5f0; }
+    #overlay .sub { color:#bce898; font-size:.92rem; }
+    #overlay .res { color:#ffe066; font-size:1.25rem; font-weight:bold; }
+    .gbtn { background:linear-gradient(135deg,#3cb53c,#1a8a1a); color:#fff; border:none; padding:10px 32px; font-size:1.05rem; font-weight:bold; border-radius:28px; cursor:pointer; box-shadow:0 4px 12px rgba(0,140,0,.5); transition:transform .14s,box-shadow .14s; }
+    .gbtn:hover { transform:scale(1.07); box-shadow:0 6px 16px rgba(0,200,0,.5); }
+    /* mushroom label */
+    #mLabel { background:rgba(0,0,0,.55); border:1px solid #4e8a32; border-radius:12px; padding:3px 12px; font-size:.8rem; color:#ffe066; min-width:80px; text-align:center; }
+    /* leaderboard */
+    #lb { background:rgba(0,0,0,.5); border:2px solid #4e8a32; border-radius:10px; padding:14px 12px; width:196px; min-height:200px; }
+    #lb h3 { color:#ffe066; font-size:.97rem; text-align:center; margin-bottom:10px; letter-spacing:1px; }
+    #rankList { list-style:none; margin-bottom:10px; }
+    #rankList li { display:flex; align-items:center; gap:5px; padding:5px; border-radius:6px; font-size:.82rem; margin-bottom:3px; background:rgba(255,255,255,.04); }
+    #rankList li.g1 { background:rgba(255,215,0,.15); border-left:3px solid gold; }
+    #rankList li.g2 { background:rgba(192,192,192,.1); border-left:3px solid silver; }
+    #rankList li.g3 { background:rgba(205,127,50,.12); border-left:3px solid #cd7f32; }
+    .rk { width:20px; text-align:center; font-size:.75rem; color:#888; }
+    .rn { flex:1; color:#ddd; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .rp { color:#ffe066; font-weight:bold; }
+    .clrbtn { display:block; width:100%; background:rgba(160,40,40,.3); border:1px solid #882828; color:#f88; padding:5px; border-radius:6px; cursor:pointer; font-size:.78rem; transition:background .13s; }
+    .clrbtn:hover { background:rgba(200,55,55,.4); }
+    /* name modal */
+    #nModal { display:none; position:fixed; inset:0; background:rgba(0,0,0,.76); align-items:center; justify-content:center; z-index:200; }
+    #nModal.show { display:flex; }
+    #nBox { background:#172e0e; border:3px solid #4e8a32; border-radius:14px; padding:24px 28px; text-align:center; max-width:300px; width:90%; }
+    #nBox h3 { color:#aaff55; margin-bottom:8px; }
+    #nBox .sc { color:#ffe066; font-size:1.15rem; margin-bottom:14px; }
+    #pname { width:100%; padding:8px 12px; border-radius:8px; border:2px solid #4e8a32; background:rgba(0,0,0,.4); color:#fff; font-size:1rem; text-align:center; margin-bottom:14px; }
+    #pname:focus { outline:none; border-color:#aaff55; }
+    .mbtns { display:flex; gap:10px; justify-content:center; }
+    .skipbtn { background:rgba(80,80,80,.4); border:1px solid #555; color:#aaa; padding:8px 20px; border-radius:20px; cursor:pointer; font-size:.95rem; }
+    /* dpad */
+    #ctrlTxt { color:#66a048; font-size:.8rem; text-align:center; }
+    #dpad { display:none; flex-direction:column; align-items:center; gap:4px; }
+    .drow { display:flex; gap:4px; }
+    .db { width:52px; height:52px; background:rgba(50,140,50,.45); border:2px solid #4e8a32; border-radius:10px; color:#fff; font-size:1.25rem; display:flex; align-items:center; justify-content:center; cursor:pointer; user-select:none; -webkit-user-select:none; }
+    .db:active { background:rgba(70,200,70,.65); }
+    @media(max-width:660px){
+      canvas{width:360px!important;height:360px!important;}
+      #lb{width:100%;}#dpad{display:flex;}h1{font-size:1.4rem;}
+    }
+  </style>
+</head>
+<body>
+<h1>🌿 皮克敏貪吃蛇 🌿</h1>
+<div id="scoreRow">
+  <div class="sbox">分數 <b id="sDisp">0</b></div>
+  <div class="sbox">最高 <b id="hDisp">0</b></div>
+  <div class="sbox">皮克敏 <b id="lDisp">3</b> 隻</div>
+  <div class="sbox" id="mLabel">—</div>
+</div>
+<div id="layout">
+  <div id="gWrap">
+    <canvas id="cv" width="600" height="600"></canvas>
+    <div id="overlay">
+      <h2>🌱 皮克敏大冒險 🌱</h2>
+      <p class="sub">帶領皮克敏消滅磨菇！</p>
+      <p style="color:#7fc060;font-size:.84rem;">方向鍵 / WASD 控制移動</p>
+      <button class="gbtn" onclick="startGame()">開始遊戲 ▶</button>
+    </div>
+  </div>
+  <aside id="lb">
+    <h3>🏆 排行榜</h3>
+    <ol id="rankList"></ol>
+    <button class="clrbtn" onclick="clearScores()">清除所有記錄</button>
+  </aside>
+</div>
+<p id="ctrlTxt">↑↓←→ 或 WASD 移動　│　碰壁或碰自己則遊戲結束</p>
+<div id="dpad">
+  <div class="drow"><div class="db" ontouchstart="td(0,-1);stopE(event)">▲</div></div>
+  <div class="drow">
+    <div class="db" ontouchstart="td(-1,0);stopE(event)">◀</div>
+    <div class="db" ontouchstart="td(0,1);stopE(event)">▼</div>
+    <div class="db" ontouchstart="td(1,0);stopE(event)">▶</div>
+  </div>
+</div>
+<div id="nModal">
+  <div id="nBox">
+    <h3>🎉 進入排行榜！</h3>
+    <p class="sc">分數：<strong id="mScore"></strong></p>
+    <input id="pname" type="text" placeholder="輸入你的名字（最多10字）" maxlength="10"/>
+    <div class="mbtns">
+      <button class="gbtn" onclick="submitScore()">確認</button>
+      <button class="skipbtn" onclick="skipScore()">跳過</button>
+    </div>
+  </div>
+</div>
+<script>
+// ═══ Constants ══════════════════════════════════════════════════════════
+const COLS=20, ROWS=20, CELL=30, W=600, H=600;
+
+// ═══ 8 Pikmin Types ═════════════════════════════════════════════════════
+// 0=赤Red 1=黃Yellow 2=藍Blue 3=紫Purple 4=白White 5=岩Rock 6=翼Winged 7=冰Ice
+const PK = [
+  { body:'#CC2828', dark:'#7A0000', lite:'#FF9090', stem:'#43A047', eyeW:'white',  name:'赤皮克敏' },
+  { body:'#F5B800', dark:'#A87800', lite:'#FFF8A0', stem:'#43A047', eyeW:'white',  name:'黃皮克敏' },
+  { body:'#1870CC', dark:'#083888', lite:'#88C8FF', stem:'#43A047', eyeW:'white',  name:'藍皮克敏' },
+  { body:'#6B1A98', dark:'#3A005E', lite:'#D090EE', stem:'#43A047', eyeW:'white',  name:'紫皮克敏' },
+  { body:'#EEEEEE', dark:'#909090', lite:'#FFFFFF', stem:'#43A047', eyeW:'#FF2000',name:'白皮克敏' },
+  { body:'#2E2A26', dark:'#111010', lite:'#605850', stem:'#43A047', eyeW:'white',  name:'岩石皮克敏' },
+  { body:'#FF80B8', dark:'#BB3068', lite:'#FFB8D8', stem:'#43A047', eyeW:'white',  name:'飛翼皮克敏' },
+  { body:'#90E4FF', dark:'#3090C8', lite:'#E0F8FF', stem:'#43A047', eyeW:'white',  name:'冰雪皮克敏' },
+];
+
+// ═══ 5 Mushroom Types ════════════════════════════════════════════════════
+// From Pikmin Bloom: 火/電/水/毒/水晶
+const MUSH = [
+  { name:'🔥 火蘑菇', cap:'#E03808', high:'#FF7030', dark:'#8A1000', spot:'#FFD060', stem:'#A04820', glow:[255,90,20],  part:[255,160,50],  kind:'fire'    },
+  { name:'⚡ 電蘑菇', cap:'#E0BB00', high:'#FFEE40', dark:'#887000', spot:'#FFFFF0', stem:'#A89000', glow:[255,220,0],  part:[255,255,80],  kind:'electric' },
+  { name:'💧 水蘑菇', cap:'#1878E8', high:'#60C0FF', dark:'#083888', spot:'#C0E8FF', stem:'#2868C0', glow:[30,120,255], part:[100,200,255], kind:'water'    },
+  { name:'☠ 毒蘑菇',  cap:'#6A8030', high:'#9AB838', dark:'#384018', spot:'#D0E870', stem:'#4E6020', glow:[110,190,40], part:[160,230,80],  kind:'poison'   },
+  { name:'💎 水晶蘑菇',cap:'#88D8F8', high:'#DAFAFF', dark:'#3080C0', spot:'#FFFFFF', stem:'#58A0E0', glow:[100,200,255],part:[210,245,255],kind:'crystal'   },
+];
+
+// ═══ Canvas ══════════════════════════════════════════════════════════════
+const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
+
+// ═══ State ═══════════════════════════════════════════════════════════════
+let snake,dir,nextDir,food,score,hiScore=0,running=false,tick=0,speed=150,loopId=null,pending=0;
+
+// ═══ Leaderboard ═════════════════════════════════════════════════════════
+const LK='pkSnakeLB_v4';
+function lbGet(){try{return JSON.parse(localStorage.getItem(LK))||[];}catch(_){return[];}}
+function lbTop(p){const a=lbGet();return a.length<10||p>a[a.length-1].score;}
+function lbSave(name,pts){
+  const a=lbGet();
+  a.push({name:name.trim()||'匿名',score:pts,date:new Date().toLocaleDateString('zh-TW')});
+  a.sort((x,y)=>y.score-x.score);if(a.length>10)a.length=10;
+  localStorage.setItem(LK,JSON.stringify(a));lbRender();
+}
+function clearScores(){if(confirm('確定清除所有排行榜記錄？')){localStorage.removeItem(LK);lbRender();}}
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function lbRender(){
+  const a=lbGet(),list=document.getElementById('rankList');
+  const mc=['🥇','🥈','🥉'],gc=['g1','g2','g3'];
+  list.innerHTML=!a.length?'<li style="color:#666;font-size:.82rem;text-align:center;list-style:none">尚無記錄</li>':
+    a.map((e,i)=>`<li class="${gc[i]||''}"><span class="rk">${mc[i]||(i+1)}</span><span class="rn" title="${esc(e.name)}">${esc(e.name)}</span><span class="rp">${e.score}</span></li>`).join('');
+}
+
+// ═══ Name modal ══════════════════════════════════════════════════════════
+function showModal(pts){pending=pts;document.getElementById('mScore').textContent=pts;document.getElementById('pname').value='';document.getElementById('nModal').classList.add('show');setTimeout(()=>document.getElementById('pname').focus(),80);}
+function submitScore(){lbSave(document.getElementById('pname').value,pending);document.getElementById('nModal').classList.remove('show');}
+function skipScore(){document.getElementById('nModal').classList.remove('show');}
+document.getElementById('pname').addEventListener('keydown',e=>{if(e.key==='Enter')submitScore();});
+
+// ═══ Audio ═══════════════════════════════════════════════════════════════
+let AC=null;
+function getAC(){if(!AC)AC=new(window.AudioContext||window.webkitAudioContext)();return AC;}
+function beep(f=660,d=80,t='sine',v=0.14){try{const ac=getAC(),o=ac.createOscillator(),g=ac.createGain();o.connect(g);g.connect(ac.destination);o.type=t;o.frequency.value=f;g.gain.setValueAtTime(v,ac.currentTime);g.gain.exponentialRampToValueAtTime(0.0001,ac.currentTime+d/1000);o.start();o.stop(ac.currentTime+d/1000);}catch(_){}}
+
+// ═══ Game logic ══════════════════════════════════════════════════════════
+function initGame(){
+  const cx=Math.floor(COLS/2),cy=Math.floor(ROWS/2);
+  snake=[{x:cx,y:cy},{x:cx-1,y:cy},{x:cx-2,y:cy}];
+  dir={x:1,y:0};nextDir={x:1,y:0};score=0;tick=0;speed=150;
+  placeFood();updateHUD();
+}
+function startGame(){
+  document.getElementById('overlay').style.display='none';
+  initGame();running=true;clearTimeout(loopId);sched();
+}
+function sched(){loopId=setTimeout(()=>{step();if(running)sched();},speed);}
+function step(){
+  tick++;dir=nextDir;
+  const hd={x:snake[0].x+dir.x,y:snake[0].y+dir.y};
+  if(hd.x<0||hd.x>=COLS||hd.y<0||hd.y>=ROWS){endGame();return;}
+  if(snake.some(s=>s.x===hd.x&&s.y===hd.y)){endGame();return;}
+  snake.unshift(hd);
+  if(hd.x===food.x&&hd.y===food.y){
+    score+=10;beep(880,90);beep(1200,70);
+    speed=Math.max(65,150-Math.floor(score/60)*12);
+    placeFood();
+  }else{snake.pop();}
+  if(score>hiScore)hiScore=score;
+  updateHUD();render();
+}
+function endGame(){
+  running=false;clearTimeout(loopId);beep(220,500,'sawtooth',0.17);
+  const ov=document.getElementById('overlay');
+  ov.innerHTML=`<h2 style="color:#ff7070">遊戲結束！</h2><p class="sub">你帶領了 <strong style="color:#aaff55">${snake.length}</strong> 隻皮克敏！</p><p class="res">🍄 分數：${score}</p><p style="color:#90cc70;font-size:.88rem">最高分：${hiScore}</p><button class="gbtn" onclick="startGame()">再玩一次 ▶</button>`;
+  ov.style.display='flex';render();
+  if(score>0&&lbTop(score))setTimeout(()=>showModal(score),650);
+}
+function placeFood(){
+  let p;do{p={x:Math.floor(Math.random()*COLS),y:Math.floor(Math.random()*ROWS)};}while(snake.some(s=>s.x===p.x&&s.y===p.y));
+  food={...p,mt:Math.floor(Math.random()*MUSH.length)};
+  updateHUD();
+}
+function updateHUD(){
+  document.getElementById('sDisp').textContent=score;
+  document.getElementById('hDisp').textContent=hiScore;
+  document.getElementById('lDisp').textContent=snake?snake.length:0;
+  document.getElementById('mLabel').textContent=food?MUSH[food.mt].name:'—';
+}
+
+// ═══ Input ═══════════════════════════════════════════════════════════════
+document.addEventListener('keydown',ev=>{
+  if(!running)return;
+  switch(ev.key){
+    case 'ArrowUp': case 'w':case 'W':if(dir.y!==1)nextDir={x:0,y:-1};break;
+    case 'ArrowDown':case 's':case 'S':if(dir.y!==-1)nextDir={x:0,y:1};break;
+    case 'ArrowLeft':case 'a':case 'A':if(dir.x!==1)nextDir={x:-1,y:0};break;
+    case 'ArrowRight':case 'd':case 'D':if(dir.x!==-1)nextDir={x:1,y:0};break;
+  }
+  if(ev.key.startsWith('Arrow'))ev.preventDefault();
+});
+function td(dx,dy){
+  if(!running)return;
+  if(dx===0&&dy===-1&&dir.y!==1)nextDir={x:0,y:-1};
+  if(dx===0&&dy===1&&dir.y!==-1)nextDir={x:0,y:1};
+  if(dx===-1&&dy===0&&dir.x!==1)nextDir={x:-1,y:0};
+  if(dx===1&&dy===0&&dir.x!==-1)nextDir={x:1,y:0};
+}
+function stopE(e){e.preventDefault();}
+let tx=0,ty=0;
+cv.addEventListener('touchstart',e=>{tx=e.touches[0].clientX;ty=e.touches[0].clientY;e.preventDefault();},{passive:false});
+cv.addEventListener('touchend',e=>{const dx=e.changedTouches[0].clientX-tx,dy=e.changedTouches[0].clientY-ty;if(Math.abs(dx)>Math.abs(dy))td(dx>0?1:-1,0);else td(0,dy>0?1:-1);e.preventDefault();},{passive:false});
+
+// ═══ Drawing helpers ═════════════════════════════════════════════════════
+function lighten(hex,n){const v=parseInt(hex.slice(1),16);return `rgb(${Math.min(255,(v>>16)+n)},${Math.min(255,((v>>8)&255)+n)},${Math.min(255,(v&255)+n)})`;}
+const bgP=Array.from({length:32},(_,i)=>({x:(i*181+37)%W,y:(i*137+29)%H,r:7+(i%5)*5,a:0.04+(i%4)*0.015}));
+function drawBG(){
+  ctx.fillStyle='#3c6824';ctx.fillRect(0,0,W,H);
+  bgP.forEach(p=>{ctx.fillStyle=`rgba(0,0,0,${p.a})`;ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fill();});
+  ctx.strokeStyle='rgba(0,0,0,0.1)';ctx.lineWidth=0.5;
+  for(let x=0;x<=COLS;x++){ctx.beginPath();ctx.moveTo(x*CELL,0);ctx.lineTo(x*CELL,H);ctx.stroke();}
+  for(let y=0;y<=ROWS;y++){ctx.beginPath();ctx.moveTo(0,y*CELL);ctx.lineTo(W,y*CELL);ctx.stroke();}
+}
+
+// ═══ Mushroom drawing ════════════════════════════════════════════════════
+function drawMushroom(){
+  if(!food)return;
+  const m=MUSH[food.mt??0];
+  const cx=food.x*CELL+CELL/2, cy=food.y*CELL+CELL/2+2;
+  const ph=1+0.07*Math.sin(tick*0.17);
+  const [gr,gg,gb]=m.glow;
+  // glow
+  const gw=ctx.createRadialGradient(cx,cy-8,0,cx,cy-8,20*ph);
+  gw.addColorStop(0,`rgba(${gr},${gg},${gb},0.5)`);gw.addColorStop(1,`rgba(${gr},${gg},${gb},0)`);
+  ctx.fillStyle=gw;ctx.beginPath();ctx.arc(cx,cy-8,20*ph,0,Math.PI*2);ctx.fill();
+  // particles
+  mushroomParticles(cx,cy,m,ph);
+  // shape by kind
+  if(m.kind==='crystal') drawCrystal(cx,cy,m,ph);
+  else drawStdMush(cx,cy,m,ph);
+}
+
+function mushroomParticles(cx,cy,m,ph){
+  const [pr,pg,pb]=m.part;
+  if(m.kind==='fire'){
+    for(let i=0;i<6;i++){
+      const a=(i/6)*Math.PI*2+tick*0.09;
+      const d=13*ph+Math.sin(tick*0.22+i)*2;
+      const fl=Math.sin(tick*0.25+i*0.9);
+      const fa=0.25+0.4*Math.abs(fl);
+      ctx.fillStyle=`rgba(${pr},${pg},${pb},${fa})`;
+      ctx.beginPath();ctx.arc(cx+Math.cos(a)*d,cy-10+Math.sin(a)*d*0.45-Math.abs(fl)*4,1.8+Math.abs(fl)*0.8,0,Math.PI*2);ctx.fill();
+    }
+  } else if(m.kind==='electric'){
+    // sparks
+    for(let i=0;i<4;i++){
+      if(Math.floor(tick*0.4+i*2)%3!==0)continue;
+      const a=(i/4)*Math.PI*2+tick*0.06;
+      const d=12*ph;const sx=cx+Math.cos(a)*d,sy=cy-8+Math.sin(a)*d*0.5;
+      ctx.strokeStyle=`rgba(${pr},${pg},${pb},0.95)`;ctx.lineWidth=1.2;
+      const zx=(Math.random()>0.5?1:-1)*5,zy=-Math.random()*9;
+      ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(sx+zx/2,sy+zy/2);ctx.lineTo(sx+zx,sy+zy);ctx.stroke();
+    }
+    for(let i=0;i<5;i++){
+      const a=(i/5)*Math.PI*2+tick*0.08;const d=14*ph+Math.sin(tick*0.2+i)*1.5;
+      const sa=0.5+0.4*Math.sin(tick*0.28+i*1.4);
+      ctx.fillStyle=`rgba(${pr},${pg},${pb},${sa})`;
+      ctx.beginPath();ctx.arc(cx+Math.cos(a)*d,cy-8+Math.sin(a)*d*0.5,1.6,0,Math.PI*2);ctx.fill();
+    }
+  } else if(m.kind==='water'){
+    for(let i=0;i<5;i++){
+      const a=(i/5)*Math.PI*2+tick*0.05;const d=14*ph+Math.sin(tick*0.12+i)*2;
+      const sa=0.2+0.22*Math.sin(tick*0.16+i*1.3);
+      ctx.strokeStyle=`rgba(${pr},${pg},${pb},${sa+0.25})`;ctx.lineWidth=1.2;
+      ctx.beginPath();ctx.arc(cx+Math.cos(a)*d,cy-8+Math.sin(a)*d*0.5,2.5+Math.sin(tick*0.14+i),0,Math.PI*2);ctx.stroke();
+    }
+  } else if(m.kind==='poison'){
+    for(let i=0;i<5;i++){
+      const a=(i/5)*Math.PI*2+tick*0.04;const d=12*ph+Math.sin(tick*0.14+i)*2;
+      const sa=0.1+0.18*Math.sin(tick*0.1+i*1.1);
+      ctx.fillStyle=`rgba(${pr},${pg},${pb},${sa})`;
+      ctx.beginPath();ctx.arc(cx+Math.cos(a)*d,cy-8+Math.sin(a)*d*0.5,3.5+Math.sin(tick*0.11+i),0,Math.PI*2);ctx.fill();
+    }
+  } else { // crystal
+    for(let i=0;i<6;i++){
+      const a=(i/6)*Math.PI*2+tick*0.05;const d=16*ph+Math.sin(tick*0.13+i)*2;
+      const sa=0.5+0.4*Math.sin(tick*0.22+i*1.2);
+      const px=cx+Math.cos(a)*d,py=cy-10+Math.sin(a)*d*0.45;
+      ctx.fillStyle=`rgba(${pr},${pg},${pb},${sa})`;
+      ctx.beginPath();ctx.moveTo(px,py-3);ctx.lineTo(px+1.8,py);ctx.lineTo(px,py+3);ctx.lineTo(px-1.8,py);ctx.closePath();ctx.fill();
+    }
+  }
+}
+
+function drawStdMush(cx,cy,m,ph){
+  const sh=11,sw=8,sx=cx-sw/2,sy=cy-sh;
+  // stem
+  ctx.fillStyle=m.stem;ctx.strokeStyle=m.dark;ctx.lineWidth=0.9;
+  ctx.beginPath();
+  ctx.moveTo(sx+2.5,sy);ctx.lineTo(sx+sw-2.5,sy);ctx.quadraticCurveTo(sx+sw,sy,sx+sw,sy+2.5);
+  ctx.lineTo(sx+sw,sy+sh-2);ctx.quadraticCurveTo(sx+sw,sy+sh,sx+sw-2.5,sy+sh);
+  ctx.lineTo(sx+2.5,sy+sh);ctx.quadraticCurveTo(sx,sy+sh,sx,sy+sh-2);
+  ctx.lineTo(sx,sy+2.5);ctx.quadraticCurveTo(sx,sy,sx+2.5,sy);
+  ctx.closePath();ctx.fill();ctx.stroke();
+  // gills underside
+  ctx.fillStyle=lighten(m.stem,40);
+  ctx.beginPath();ctx.ellipse(cx,cy-sh,13*ph,4.5,0,0,Math.PI*2);ctx.fill();
+  // cap
+  const cr=12.5*ph;
+  const ccy=cy-sh-cr*0.5;
+  // cap gradient
+  const cg=ctx.createRadialGradient(cx-cr*.33,ccy-cr*.42,cr*.04,cx,ccy,cr);
+  cg.addColorStop(0,m.high);cg.addColorStop(0.48,m.cap);cg.addColorStop(1,m.dark);
+  ctx.fillStyle=cg;
+  if(m.kind==='fire'){
+    // spiky edge
+    ctx.beginPath();ctx.moveTo(cx-cr,ccy);
+    for(let i=0;i<=24;i++){const a=Math.PI+(i/24)*Math.PI;const sp=i%2===0?1:1.14;ctx.lineTo(cx+Math.cos(a)*cr*sp,ccy+Math.sin(a)*cr*sp*0.87);}
+    ctx.closePath();ctx.fill();ctx.strokeStyle=m.dark;ctx.lineWidth=1;ctx.stroke();
+  } else if(m.kind==='water'){
+    // full sphere look
+    ctx.beginPath();ctx.arc(cx,ccy+cr*0.18,cr,0,Math.PI*2);ctx.fill();
+    ctx.strokeStyle=m.dark;ctx.lineWidth=1;ctx.stroke();
+    ctx.fillStyle='rgba(200,240,255,0.14)';ctx.beginPath();ctx.arc(cx,ccy+cr*0.18,cr,0,Math.PI*2);ctx.fill();
+  } else if(m.kind==='electric'){
+    // slightly flattened
+    ctx.beginPath();ctx.ellipse(cx,ccy,cr,cr*0.72,0,0,Math.PI*2);ctx.fill();
+    ctx.strokeStyle=m.dark;ctx.lineWidth=1.2;ctx.stroke();
+    // lightning vein
+    ctx.strokeStyle='rgba(255,255,180,0.45)';ctx.lineWidth=0.9;
+    ctx.beginPath();ctx.moveTo(cx-cr*.28,ccy);ctx.lineTo(cx,ccy-cr*.38);ctx.lineTo(cx+cr*.28,ccy);ctx.stroke();
+  } else if(m.kind==='poison'){
+    // bumpy dome
+    ctx.beginPath();ctx.ellipse(cx,ccy,cr,cr*0.88,0,0,Math.PI*2);ctx.fill();
+    ctx.strokeStyle=m.dark;ctx.lineWidth=1;ctx.stroke();
+    ctx.fillStyle=lighten(m.cap,-22);
+    [{x:-cr*.4,y:-cr*.12},{x:cr*.32,y:-cr*.22},{x:.02,y:-cr*.48},{x:-cr*.1,y:cr*.2},{x:cr*.42,y:cr*.18}].forEach(b=>{ctx.beginPath();ctx.arc(cx+b.x,ccy+b.y,2.8,0,Math.PI*2);ctx.fill();});
+  } else {
+    ctx.beginPath();ctx.ellipse(cx,ccy,cr,cr*0.88,0,0,Math.PI*2);ctx.fill();
+    ctx.strokeStyle=m.dark;ctx.lineWidth=1;ctx.stroke();
+  }
+  // spots
+  if(m.kind!=='water'){
+    ctx.fillStyle=m.spot;
+    [{dx:-5,dy:-7,r:2.8},{dx:4,dy:-10,r:2.1},{dx:7.5,dy:-4,r:2.0},{dx:-1,dy:-3,r:1.6},{dx:1,dy:-13,r:1.4}].forEach(s=>{ctx.beginPath();ctx.arc(cx+s.dx,ccy+s.dy,s.r,0,Math.PI*2);ctx.fill();});
+  }
+  // shine
+  const shine=ctx.createRadialGradient(cx-cr*.32,ccy-cr*.38,0,cx-cr*.14,ccy-cr*.14,cr*.52);
+  shine.addColorStop(0,'rgba(255,255,255,0.28)');shine.addColorStop(1,'rgba(255,255,255,0)');
+  ctx.fillStyle=shine;ctx.beginPath();ctx.ellipse(cx,ccy,cr,cr*0.88,0,0,Math.PI*2);ctx.fill();
+}
+
+function drawCrystal(cx,cy,m,ph){
+  // Draw a gem/diamond crystal prism
+  const cr=12*ph, ccy=cy-10;
+  const pts=[
+    [cx,        ccy-cr*1.3],  // apex
+    [cx+cr*.85, ccy-cr*.1],   // upper-right
+    [cx+cr*.6,  ccy+cr*.65],  // lower-right
+    [cx-cr*.6,  ccy+cr*.65],  // lower-left
+    [cx-cr*.85, ccy-cr*.1],   // upper-left
+  ];
+  // main gradient fill
+  const cg=ctx.createLinearGradient(cx-cr,ccy-cr,cx+cr,ccy+cr);
+  cg.addColorStop(0,m.high);cg.addColorStop(0.4,m.cap);cg.addColorStop(1,m.dark);
+  ctx.fillStyle=cg;
+  ctx.beginPath();ctx.moveTo(...pts[0]);pts.slice(1).forEach(p=>ctx.lineTo(...p));ctx.closePath();ctx.fill();
+  // facet highlight (left face)
+  ctx.fillStyle='rgba(255,255,255,0.18)';
+  ctx.beginPath();ctx.moveTo(...pts[0]);ctx.lineTo(...pts[4]);ctx.lineTo(...pts[3]);ctx.lineTo(cx,ccy+cr*.2);ctx.closePath();ctx.fill();
+  // facet lines
+  ctx.strokeStyle=m.high;ctx.lineWidth=0.9;
+  ctx.beginPath();ctx.moveTo(...pts[0]);ctx.lineTo(cx,ccy+cr*.2);
+  ctx.moveTo(...pts[1]);ctx.lineTo(cx,ccy+cr*.2);
+  ctx.moveTo(...pts[4]);ctx.lineTo(cx,ccy+cr*.2);
+  ctx.stroke();
+  // outline
+  ctx.strokeStyle=m.dark;ctx.lineWidth=1.2;
+  ctx.beginPath();ctx.moveTo(...pts[0]);pts.slice(1).forEach(p=>ctx.lineTo(...p));ctx.closePath();ctx.stroke();
+  // gloss
+  const gl=ctx.createRadialGradient(cx-cr*.2,ccy-cr*.6,0,cx,ccy-cr*.2,cr*.6);
+  gl.addColorStop(0,'rgba(255,255,255,0.32)');gl.addColorStop(1,'rgba(255,255,255,0)');
+  ctx.fillStyle=gl;ctx.beginPath();ctx.moveTo(...pts[0]);pts.slice(1).forEach(p=>ctx.lineTo(...p));ctx.closePath();ctx.fill();
+}
+
+// ═══ Pikmin drawing ══════════════════════════════════════════════════════
+function drawPikmin(cx,cy,ti,isHead,phase,faceDir){
+  const t=PK[ti%PK.length];
+  const r=(ti===3)?11:(ti===4)?9:(ti===5)?11:10; // purple/rock bigger, white smaller
+  const bob=Math.sin(phase)*1.7;
+  const sw=Math.sin(phase*0.55)*1.8;
+  ctx.save();
+  ctx.translate(cx,cy+bob);
+  if(isHead&&faceDir&&faceDir.x===-1)ctx.scale(-1,1);
+
+  // ── Winged Pikmin: wings flutter behind body ──
+  if(ti===6){
+    const wf=Math.sin(phase*2.5)*0.12;
+    ctx.save();ctx.globalAlpha=0.55+0.2*Math.abs(Math.sin(phase*2.5));
+    ctx.fillStyle='#D0F4FF';ctx.strokeStyle='#80C8E8';ctx.lineWidth=0.8;
+    // upper wings
+    ctx.beginPath();ctx.ellipse(-r*0.4,-r*1.0,r*0.7,r*0.38,wf-0.5,0,Math.PI*2);ctx.fill();ctx.stroke();
+    ctx.beginPath();ctx.ellipse(r*0.4,-r*1.0,r*0.7,r*0.38,-wf+0.5,0,Math.PI*2);ctx.fill();ctx.stroke();
+    // lower wings (smaller)
+    ctx.beginPath();ctx.ellipse(-r*0.55,-r*0.6,r*0.45,r*0.25,wf-0.3,0,Math.PI*2);ctx.fill();ctx.stroke();
+    ctx.beginPath();ctx.ellipse(r*0.55,-r*0.6,r*0.45,r*0.25,-wf+0.3,0,Math.PI*2);ctx.fill();ctx.stroke();
+    ctx.restore();
+  }
+
+  // ── Stem (all except rock uses stem) ──
+  if(ti!==5){
+    const sbY=-r+2, stY=sbY-9, stX=sw*0.38;
+    ctx.beginPath();ctx.strokeStyle=t.stem;ctx.lineWidth=1.9;
+    ctx.moveTo(sw*0.14,sbY);ctx.quadraticCurveTo(sw*0.75,sbY-4.5,stX,stY);ctx.stroke();
+    // flower or leaf
+    if(isHead){
+      ctx.save();ctx.translate(stX,stY);
+      const pc=['#FFE082','#FFF176','#FFCC02','#FFD740'];
+      for(let i=0;i<6;i++){const a=(i/6)*Math.PI*2;ctx.save();ctx.rotate(a);ctx.fillStyle=pc[i%4];ctx.beginPath();ctx.ellipse(0,-5.8,2.7,4.4,0,0,Math.PI*2);ctx.fill();ctx.restore();}
+      ctx.beginPath();ctx.fillStyle='#FF6D00';ctx.arc(0,0,4.6,0,Math.PI*2);ctx.fill();
+      ctx.beginPath();ctx.fillStyle='#FFD600';ctx.arc(0,0,2.6,0,Math.PI*2);ctx.fill();
+      ctx.restore();
+    } else {
+      const stX2=sw*0.38,stY2=-r+2-9;
+      ctx.save();ctx.translate(stX2+2.6,stY2+1.6);ctx.rotate(0.72);
+      ctx.fillStyle='#2E7D32';ctx.strokeStyle='#1B5E20';ctx.lineWidth=0.6;
+      ctx.beginPath();ctx.ellipse(0,0,6,3.6,0,0,Math.PI*2);ctx.fill();ctx.stroke();
+      ctx.restore();
+    }
+  } else {
+    // Rock Pikmin: tiny rock pebble on top
+    ctx.fillStyle='#555040';
+    ctx.beginPath();ctx.ellipse(sw*0.2,-r-2,4,2.5,0.2,0,Math.PI*2);ctx.fill();
+  }
+
+  // ── Yellow Pikmin: large triangular ears (before body) ──
+  if(ti===1){
+    ctx.fillStyle=t.body;ctx.strokeStyle=t.dark;ctx.lineWidth=1;
+    // Left ear - pointing upward and out
+    ctx.beginPath();ctx.moveTo(-r*0.3,-r*0.5);ctx.lineTo(-r*1.55,-r*0.7);ctx.lineTo(-r*0.8,r*0.2);ctx.closePath();ctx.fill();ctx.stroke();
+    // Right ear
+    ctx.beginPath();ctx.moveTo(r*0.3,-r*0.5);ctx.lineTo(r*1.55,-r*0.7);ctx.lineTo(r*0.8,r*0.2);ctx.closePath();ctx.fill();ctx.stroke();
+    // Inner ear
+    ctx.fillStyle=lighten(t.body,35);
+    ctx.beginPath();ctx.moveTo(-r*0.35,-r*0.42);ctx.lineTo(-r*1.25,-r*0.6);ctx.lineTo(-r*0.75,r*0.08);ctx.closePath();ctx.fill();
+    ctx.beginPath();ctx.moveTo(r*0.35,-r*0.42);ctx.lineTo(r*1.25,-r*0.6);ctx.lineTo(r*0.75,r*0.08);ctx.closePath();ctx.fill();
+  }
+
+  // ── Small arms on sides ──
+  if(ti!==5){ // not rock
+    ctx.fillStyle=t.body;ctx.strokeStyle=t.dark;ctx.lineWidth=0.7;
+    // left arm
+    ctx.beginPath();ctx.ellipse(-r-2.5,r*0.05,4,3,-0.5,0,Math.PI*2);ctx.fill();ctx.stroke();
+    // right arm
+    ctx.beginPath();ctx.ellipse(r+2.5,r*0.05,4,3,0.5,0,Math.PI*2);ctx.fill();ctx.stroke();
+  }
+
+  // ── Drop shadow ──
+  ctx.fillStyle='rgba(0,0,0,0.18)';
+  ctx.beginPath();ctx.ellipse(2,r*0.44,r*(ti===5?1.0:0.76),r*0.22,0,0,Math.PI*2);ctx.fill();
+
+  // ── Main body ──
+  ctx.save();
+  if(ti===3)ctx.scale(1.13,1.0);  // purple wider
+  if(ti===4)ctx.scale(0.88,1.05); // white narrower
+  const bg=ctx.createRadialGradient(-r*.32,-r*.38,0,0,0,r*1.06);
+  bg.addColorStop(0,t.lite);bg.addColorStop(0.42,t.body);bg.addColorStop(1,t.dark);
+  ctx.fillStyle=bg;
+  ctx.save();ctx.scale(1,1.09); // slight pear shape
+  ctx.beginPath();ctx.arc(0,0,r,0,Math.PI*2);ctx.fill();
+  ctx.strokeStyle=t.dark;ctx.lineWidth=0.8;ctx.stroke();
+  ctx.restore();
+  ctx.restore();
+
+  // ── Rock Pikmin: irregular surface texture ──
+  if(ti===5){
+    ctx.fillStyle=t.dark;
+    [{a:0.3,d:r*0.82,r:2.6},{a:1.2,d:r*0.78,r:3.0},{a:2.2,d:r*0.8,r:2.3},{a:3.3,d:r*0.85,r:2.8},{a:4.5,d:r*0.8,r:2.2},{a:5.5,d:r*0.82,r:3.1}].forEach(b=>{ctx.beginPath();ctx.arc(Math.cos(b.a)*b.d,Math.sin(b.a)*b.d,b.r,0,Math.PI*2);ctx.fill();});
+  }
+
+  // ── Ice Pikmin: crystal facets on body ──
+  if(ti===7){
+    ctx.strokeStyle='rgba(200,245,255,0.55)';ctx.lineWidth=0.9;
+    [{a:0.5,d:r*0.7},{a:2.0,d:r*0.65},{a:3.5,d:r*0.72},{a:5.0,d:r*0.68}].forEach(f=>{
+      const px=Math.cos(f.a)*f.d,py=Math.sin(f.a)*f.d;
+      ctx.beginPath();ctx.moveTo(px-2.5,py);ctx.lineTo(px+2.5,py);ctx.moveTo(px,py-2.5);ctx.lineTo(px,py+2.5);ctx.stroke();
+    });
+    // icy sparkle at top-left
+    ctx.fillStyle='rgba(220,248,255,0.6)';ctx.beginPath();ctx.arc(-r*.38,-r*.42,2.5,0,Math.PI*2);ctx.fill();
+  }
+
+  // ── Type-specific face features ──
+  // Red: rocky bumps + beak nose
+  if(ti===0){
+    ctx.fillStyle=t.dark;
+    for(let i=0;i<4;i++){const a=Math.PI*.45+i*Math.PI*.24;ctx.beginPath();ctx.arc(Math.cos(a)*(r-1),Math.sin(a)*(r+1),2.3,0,Math.PI*2);ctx.fill();}
+    // beak/nose
+    ctx.fillStyle=lighten(t.dark,25);
+    ctx.beginPath();ctx.moveTo(r*.62,-r*.1);ctx.lineTo(r*1.3,-r*.32);ctx.lineTo(r*.62,-r*.54);ctx.closePath();ctx.fill();
+    ctx.strokeStyle=t.dark;ctx.lineWidth=0.6;ctx.beginPath();ctx.moveTo(r*.62,-r*.1);ctx.lineTo(r*1.3,-r*.32);ctx.lineTo(r*.62,-r*.54);ctx.closePath();ctx.stroke();
+  }
+  // Blue: open mouth with horizontal lines
+  if(ti===2){
+    ctx.strokeStyle='rgba(0,12,70,0.6)';ctx.lineWidth=1.9;
+    ctx.beginPath();ctx.arc(0,r*.3,r*.3,0.08,Math.PI-0.08);ctx.stroke();
+    ctx.strokeStyle='rgba(180,220,255,0.42)';ctx.lineWidth=0.9;
+    [-r*.14,0,r*.14].forEach(lx=>{ctx.beginPath();ctx.moveTo(lx,r*.3);ctx.lineTo(lx,r*.52);ctx.stroke();});
+  }
+  // Purple: hair tufts on top
+  if(ti===3){
+    ctx.fillStyle='#8B1AC0';
+    for(let i=0;i<5;i++){ctx.beginPath();ctx.ellipse((i-2)*3.8,-r*.87,1.5,3.1,Math.sin(i*.85)*.32,0,Math.PI*2);ctx.fill();}
+  }
+  // Winged: rosy cheeks
+  if(ti===6){
+    ctx.fillStyle='rgba(255,100,160,0.32)';
+    ctx.beginPath();ctx.arc(-r*.42,r*.1,r*.22,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(r*.42,r*.1,r*.22,0,Math.PI*2);ctx.fill();
+  }
+  // Ice: cold blush
+  if(ti===7){
+    ctx.fillStyle='rgba(150,230,255,0.25)';
+    ctx.beginPath();ctx.arc(-r*.4,r*.05,r*.2,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(r*.4,r*.05,r*.2,0,Math.PI*2);ctx.fill();
+  }
+
+  // ── Eyes ──
+  ctx.fillStyle=t.eyeW;
+  ctx.beginPath();
+  ctx.ellipse(-r*.32,-r*.22,r*.23,r*.22,0,0,Math.PI*2);
+  ctx.ellipse(r*.32,-r*.22,r*.23,r*.22,0,0,Math.PI*2);
+  ctx.fill();
+  // pupils (head looks forward)
+  const eo=isHead?1.4:0.4;
+  ctx.fillStyle='#080808';
+  ctx.beginPath();ctx.arc(-r*.27+eo,-r*.21,r*.108,0,Math.PI*2);ctx.arc(r*.36+eo,-r*.21,r*.108,0,Math.PI*2);ctx.fill();
+  // shine
+  ctx.fillStyle='rgba(255,255,255,0.85)';
+  ctx.beginPath();ctx.arc(-r*.21+eo,-r*.27,r*.04,0,Math.PI*2);ctx.arc(r*.41+eo,-r*.27,r*.04,0,Math.PI*2);ctx.fill();
+  // Rock has slightly more sunken eyes – add dark ring
+  if(ti===5){ctx.strokeStyle='rgba(0,0,0,0.4)';ctx.lineWidth=0.8;ctx.beginPath();ctx.arc(-r*.32,-r*.22,r*.25,0,Math.PI*2);ctx.arc(r*.32,-r*.22,r*.25,0,Math.PI*2);ctx.stroke();}
+
+  // ── Head-only details ──
+  if(isHead){
+    // smile
+    ctx.strokeStyle='rgba(0,0,0,0.42)';ctx.lineWidth=1.2;
+    ctx.beginPath();ctx.arc(0,r*.23,r*.22,0.28,Math.PI-0.28);ctx.stroke();
+    // leader ⭐ star
+    const sc=-r*1.22;
+    ctx.fillStyle='rgba(255,255,80,0.88)';
+    ctx.beginPath();
+    for(let k=0;k<10;k++){const a=(k/10)*Math.PI*2-Math.PI/2;const sr=k%2===0?4.5:2;ctx.lineTo(Math.cos(a)*sr,sc+Math.sin(a)*sr);}
+    ctx.closePath();ctx.fill();
+  }
+
+  // ── Tiny legs ──
+  if(ti!==6){ // winged hover, no legs shown
+    ctx.fillStyle=t.dark;
+    ctx.beginPath();ctx.arc(-r*.32,r*0.92,2.2,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(r*.32,r*0.92,2.2,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle=lighten(t.dark,20);
+    ctx.beginPath();ctx.arc(-r*.32,r*1.05,1.5,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(r*.32,r*1.05,1.5,0,Math.PI*2);ctx.fill();
+  }
+
+  ctx.restore();
+}
+
+// ═══ Render ══════════════════════════════════════════════════════════════
+function render(){
+  drawBG();
+  if(!snake)return;
+  drawMushroom();
+  for(let i=snake.length-1;i>=0;i--){
+    const s=snake[i];
+    drawPikmin(s.x*CELL+CELL/2,s.y*CELL+CELL/2,i%8,i===0,tick*0.3+i*0.55,i===0?dir:null);
+  }
+}
+
+// ═══ Init & splash ═══════════════════════════════════════════════════════
+lbRender();
+
+(function splash(){
+  const ss=[{x:7,y:10},{x:6,y:10},{x:5,y:10},{x:4,y:10},{x:3,y:10},{x:2,y:10},{x:1,y:10},{x:0,y:10}];
+  food={x:12,y:10,mt:0};
+  let tf=0;
+  function anim(){if(running)return;tf++;tick=tf;drawBG();drawMushroom();ss.forEach((s,i)=>drawPikmin(s.x*CELL+CELL/2,s.y*CELL+CELL/2,i%8,i===0,tf*0.12+i*0.55,{x:1,y:0}));requestAnimationFrame(anim);}
+  anim();
+})();
+</script>
+</body>
+</html>
